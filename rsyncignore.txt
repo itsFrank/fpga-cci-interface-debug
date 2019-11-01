@@ -1,0 +1,17 @@
+- /.git
+- /.vscode
+- /.gitignore
+- rsyncignore.txt
+- /hw/build
+- /hw/sim
+- /hw/synth
+- /hw/synth*
+- /hw/test/work*
+- /hw/test/compile.log
+- /hw/test/run.log
+- /hw/test/.*
+- /hw/test/vsim.wlf
+- /hw/test/alt_lib 
+- sw/obj
+- sw/interface_debug
+- sw/interface_debug_ase

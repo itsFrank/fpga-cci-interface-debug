@@ -1,0 +1,14 @@
+- /.git
+- /.vscode
+- /.gitignore
+- rsyncignore.txt
+- /build
+- /sim
+- /synth
+- /synth*
+- /test/work*
+- /test/compile.log
+- /test/run.log
+- /test/.*
+- /test/vsim.wlf
+- /test/alt_lib

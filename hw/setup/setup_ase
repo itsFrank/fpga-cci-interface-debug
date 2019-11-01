@@ -1,0 +1,12 @@
+#!/bin/sh
+
+##
+## Setup ASE environment using sources.txt in the same directory as
+## this script.
+##
+
+
+SCRIPT=$(readlink -f "$0")
+SCRIPT_PATH=$(dirname "$SCRIPT")
+
+afu_sim_setup --sources="${SCRIPT_PATH}/sources.txt" $@

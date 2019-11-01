@@ -1,0 +1,28 @@
+{
+   "version": 1,
+   "afu-image": {
+      "power": 0,
+      "afu-top-interface":
+         {
+            "name": "ccip_std_afu",
+            "module-ports" :
+               [
+                  {
+                     "class": "cci-p",
+                     "params":
+                        {
+                           "clock": "pClk"
+                        }
+                  }
+               ]
+         },
+      "accelerator-clusters":
+         [
+            {
+               "name": "traversal_fpga",
+               "total-contexts": 1,
+               "accelerator-type-uuid": "092a3e62-81c5-499a-ae2c-62ff4788fadd"
+            }
+         ]
+   }
+}

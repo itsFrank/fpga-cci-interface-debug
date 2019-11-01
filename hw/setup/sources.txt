@@ -1,0 +1,15 @@
+C:./opae-common/base_sources.txt
+
++incdir+../rtl
++incdir+../include_modules
+
+./interface_debug.json
+../include_modules/scfifo/scfifo.svh
+../include_modules/scfifo/scfifo.sv
+../include_modules/lpm_counter/lpm_counter.svh
+../include_modules/lpm_counter/lpm_counter.sv
+
+../rtl/afu_base.svh
+../rtl/interface_debug.svh
+../rtl/interface_debug.sv
+../rtl/read_engine.sv
