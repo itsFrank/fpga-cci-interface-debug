@@ -12,8 +12,8 @@ module READ_ENGINE (
     ctrl_resp_if.to_module  ctrl_resp,
 
     output logic        rd_valid,
-    output t_cci_mdata  mdata,
-    output t_cci_clAddr addr,
+    output t_cci_mdata  rd_mdata,
+    output t_cci_clAddr rd_addr,
 
     output logic run_done
 );
@@ -99,14 +99,14 @@ module READ_ENGINE (
         unique case(afu_state)
             AFU_CTRL: begin
                 rd_valid    <= c_rd_valid;
-                mdata       <= c_mdata;
-                addr        <= c_addr;
+                rd_mdata    <= c_mdata;
+                rd_addr     <= c_addr;
             end
 
             AFU_RUN: begin
                 rd_valid    <= r_rd_valid;
-                mdata       <= r_mdata;
-                addr        <= r_addr;
+                rd_mdata    <= r_mdata;
+                rd_addr     <= r_addr;
             end
 
             default: begin

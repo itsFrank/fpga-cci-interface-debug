@@ -146,8 +146,8 @@ module app_afu (
 		.ctrl_resp(ctrl_resp),
 
 		.rd_valid(rd_valid),
-		.mdata(rd_hdr.metadata),
-		.addr(rd_hdr.addr)
+		.rd_mdata(rd_hdr.metadata),
+		.rd_addr(rd_hdr.addr)
 	);
 
 	/********************************************/
