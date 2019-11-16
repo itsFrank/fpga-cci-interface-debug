@@ -13,3 +13,4 @@ C:./opae-common/base_sources.txt
 ../rtl/interface_debug.svh
 ../rtl/interface_debug.sv
 ../rtl/read_engine.sv
+../rtl/write_engine.sv

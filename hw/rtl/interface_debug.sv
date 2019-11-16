@@ -37,11 +37,13 @@ module app_afu (
     t_ccip_clAddr afu_ctrl_addr; // REG 1
 	// Request Headers
 		// Read
-		logic rd_valid;
+		logic 				rd_valid;
 		rd_req_hdr_config_t rd_hdr;                  
 		
 		t_uint32 rd_resp_fifo_overflow_risk; // Tracks if additional outstanding reads would risk overflowing the FIFO 
 		// Write 
+		logic 				wr_valid;
+		t_cci_clData 		wr_data;
 		wr_req_hdr_config_t wr_hdr;
 
 		integer i;
@@ -150,6 +152,23 @@ module app_afu (
 		.rd_addr(rd_hdr.addr)
 	);
 
+	logic wr_engine_reset;
+	always_ff @(posedge clk) begin
+		wr_engine_reset <= afu_next_state != AFU_RUN;
+	end
+
+	WRITE_ENGINE write_engine_mod (
+		.clk(clk),
+		.reset(wr_engine_reset), 
+		.stall(fiu.c1TxAlmFull),
+
+		.wr_start_addr(ctrl_resp.wr_addr),
+		.wr_data_fifo(wr_data_fifo),
+
+		.wr_valid(wr_valid),
+		.wr_addr(wr_hdr.addr),
+		.wr_data(wr_data)
+	);
 	/********************************************/
 	/*  HOUSE KEEPING							*/
 	/********************************************/
@@ -159,7 +178,7 @@ module app_afu (
 	// This AFU makes no read requests
 	// assign fiu.c0Tx.valid = 1'b0;
 	//This AFU makes no write requests
-	assign fiu.c1Tx.valid = 1'b0;
+	// assign fiu.c1Tx.valid = 1'b0;
 
  	always_comb begin
 		// The AFU ID is a unique ID for a given program.
@@ -187,12 +206,18 @@ module app_afu (
 		wr_hdr.params.vc_sel = eVC_VA;
 		wr_hdr.params.cl_len = eCL_LEN_1;
 		wr_hdr.hint = eREQ_WRLINE_I;
+		wr_hdr.metadata = '0;
 		wr_hdr.hdr = cci_mpf_c1_genReqHdr(wr_hdr.hint, wr_hdr.addr, wr_hdr.metadata, wr_hdr.params);
 	end
 
 	always_ff @(posedge clk) begin
-		fiu.c0Tx <= cci_mpf_genC0TxReadReq(rd_hdr.hdr, rd_valid);
-		fiu.c0Tx.valid <= rd_valid;
+		// Send read requests
+		fiu.c0Tx.valid 	<= rd_valid;
+		fiu.c0Tx 		<= cci_mpf_genC0TxReadReq(rd_hdr.hdr, rd_valid);
+
+		// Send write requests
+		fiu.c1Tx.valid  <= wr_valid;
+		fiu.c1Tx        <= cci_mpf_genC1TxWriteReq(wr_hdr.hdr, wr_data, wr_valid);                                                           
 	end
 
 	//CSR READ Control

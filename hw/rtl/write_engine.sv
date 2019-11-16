@@ -1,25 +1,28 @@
-module write_engine (
+import afu_base::*;
+import interface_debug::*;
+import cci_mpf_if_pkg::*;
+
+module WRITE_ENGINE (
     input logic clk,
     input logic reset, // reset will be asserted whenever the afu is not in the run state
     input logic stall,
 
     input t_cci_clAddr  wr_start_addr,
-    fifo_if.to_consumer wr_data_fifo,
+    i_fifo.to_consumer  wr_data_fifo,
 
     output logic        wr_valid,
     output t_cci_clAddr wr_addr,
-    output t_cciClData  wr_data
+    output t_cci_clData wr_data
 );
 
 t_uint32 wr_offset; 
 
 logic           valid_s1;
-t_cciClData     wr_data_s1;
+t_cci_clData     wr_data_s1;
 
 assign wr_data_fifo.rd_en = ~stall && ~wr_data_fifo.empty && ~reset;
 
 always_ff @(posedge clk) begin
-    
     wr_valid    <= valid_s1;
     wr_addr     <= wr_offset + wr_start_addr;
     wr_data     <= wr_data_fifo.data_out;
