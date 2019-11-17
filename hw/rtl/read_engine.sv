@@ -4,7 +4,6 @@ import cci_mpf_if_pkg::*;
 
 module READ_ENGINE (
     input logic clk,
-
     input logic stall,
 
     input e_afu_state       afu_state,
@@ -24,37 +23,39 @@ module READ_ENGINE (
     t_cci_clAddr r_addr;
 
     t_cci_clAddr    last_cl;
+    t_cci_clAddr    current_cl;
     t_cci_clAddr    run_start_addr;
     t_uint32        run_num_cls;
 
     logic           rd_valid_s1;
     logic           rd_valid_s2;
-    t_cci_clAddr    current_cl_s1;
-    t_cci_clAddr    current_cl_s2;
+    t_cci_clAddr    r_addr_s1;
+    t_cci_clAddr    r_addr_s2;
     always_ff @(posedge clk) begin
         rd_valid_s1  <= 0;
 
         r_rd_valid  <= rd_valid_s2 && ~run_done;
         r_mdata     <= READ_RUN_MDATA;
-        r_addr      <= current_cl_s2;
+        r_addr      <= r_addr_s2;
 
         last_cl     <= run_start_addr + run_num_cls;
-        run_done    <= current_cl_s1 > last_cl;
+        run_done    <= current_cl > last_cl;
         
-        rd_valid_s2     <= rd_valid_s1;
-        current_cl_s2   <= current_cl_s1;
+        rd_valid_s2 <= rd_valid_s1;
+        r_addr_s2   <= r_addr_s1;
 
         unique case(afu_state)
             AFU_RUN: begin
                 if (~stall) begin
                     rd_valid_s1     <= 1;
-                    current_cl_s1   <= current_cl_s1 + 1;
+                    r_addr_s1       <= current_cl;
+                    current_cl      <= current_cl + 1;
                 end
             end
 
             AFU_CTRL: begin
                 if (ctrl_resp.valid && ctrl_resp.code == CONTROL_START_RUN) begin
-                    current_cl_s1   <= ctrl_resp.rd_addr;
+                    current_cl      <= ctrl_resp.rd_addr;
                     run_start_addr  <= ctrl_resp.rd_addr;
                     run_num_cls     <= ctrl_resp.num_cls;
                 end
@@ -94,7 +95,7 @@ module READ_ENGINE (
         endcase
     end
 
-    // Select rd params based on state
+    // Select rd signals based on state
     always_ff @(posedge clk) begin
         unique case(afu_state)
             AFU_CTRL: begin

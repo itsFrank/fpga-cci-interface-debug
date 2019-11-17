@@ -36,8 +36,6 @@
 namespace opaeutils {
     using namespace std;
 
-    
-
     struct buffer_t {
         uint64_t num_cls;
         uint64_t cl_offset;
@@ -75,6 +73,11 @@ namespace opaeutils {
                 this->workspace_allocated = false;
 
                 this->UUID = UUID;
+            }
+
+            ~AFU_Handle() {
+                // delete this->csrs;
+                delete this->fpgaHandle;
             }
 
             uint64_t getWorkspaceCLs() {

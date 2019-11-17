@@ -1,23 +1,43 @@
-import afu_base::*;
-import cci_mpf_if_pkg::*;
-
 package interface_debug;
+    import afu_base::*;
+    import cci_mpf_if_pkg::*;
 
+    // Read request metadata values
     localparam READ_CTRL_MDATA  = 16'd3;
     localparam READ_RUN_MDATA   = 16'd5;
 
+    // AFU states
     typedef enum logic[2:0] {  
-        AFU_IDLE    = 3'd0,
-        AFU_CTRL    = 3'd1,
-        AFU_RUN     = 3'd2,
-        AFU_DONE    = 3'd3
+        AFU_IDLE            = 3'd0,
+        AFU_CTRL            = 3'd1,
+        AFU_RUN             = 3'd2,
+        AFU_DONE            = 3'd3,
+        AFU_SHUTDOWN        = 3'd4,
+        AFU_SHUTDOWN_WAIT   = 3'd5
     } e_afu_state;
 
+    // Control codes recieved from CPU
     typedef enum logic[2:0] {  
-        CONTROL_NONE        = 3'd0,
-        CONTROL_START_RUN   = 3'd1
+        CONTROL_NONE            = 3'd0,
+        CONTROL_START_RUN       = 3'd1,
+        CONTROL_AFU_SHUTDOWN    = 3'd2
     } e_control_code;
+
+    // Status codes sent to CPU
+    typedef enum logic[2:0] {  
+        STATUS_NONE = 3'd0,
+        STATUS_DONE = 3'd3
+    } e_status_code;
+
+    function automatic t_cci_clData constructStatusCL(e_status_code status_code, t_uint32 run_cls_sent);
+        return {384'(0), 64'(run_cls_sent), 64'(status_code)};
+    endfunction
+
 endpackage
+
+import afu_base::*;
+import cci_mpf_if_pkg::*;
+import interface_debug::*;
 
 interface ctrl_resp_if(
     input logic         clk, 
@@ -25,7 +45,6 @@ interface ctrl_resp_if(
     input logic         ctrl_resp_valid,
     input t_cci_clData  rd_resp_data 
 );
-    import interface_debug::*;
 
 // BEGIN - Interface Ports
     logic valid;
@@ -47,8 +66,8 @@ interface ctrl_resp_if(
     );
 // END - Interface Ports
 
-    t_uint8 last_nonce;         // Used to differentiate valid control responce from stale responses
-    t_uint8 current_nonce;              // Used to differentiate valid control responce from stale responses
+    t_uint8 last_nonce;     // Used to differentiate valid control response from stale responses
+    t_uint8 current_nonce;  // Used to differentiate valid control response from stale responses
 
     t_uint64 [7:0] rd_resp_u64;
 
@@ -56,7 +75,7 @@ interface ctrl_resp_if(
     assign current_nonce    = rd_resp_u64[7][63:56];
     
     always_ff @(posedge clk) begin
-        valid   <= ctrl_resp_valid && (current_nonce != last_nonce); // If current nonce is same as last nonce this is a stale control word
+        valid   <= ctrl_resp_valid && (current_nonce != last_nonce); // If current nonce is same as last nonce this is a stale control instruction
         ack     <= ctrl_resp_valid; // Used by read engine to determine when to re-request control_word
 
         // Initialize and assign last_nonce 
