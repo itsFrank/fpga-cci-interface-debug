@@ -362,24 +362,27 @@ module app_afu (
 
         // Check if intermediate count is greater than stall threshold
         rd_resp_fifo_overflow_risk <= rd_resp_fifo_count_intermediate > t_uint32'(READ_RESP_FIFO_DEPTH - FIFO_ALM_FULL_BUFFER);
+
+		rd_interface_busy <= ~c0NotEmpty;
+		wr_interface_busy <= ~c1NotEmpty;
     end
 
 	// Tracks outstanding (un-ackd) request counts for read / write interface
     // Run state will not end until:
     //      - All read requests have recieved a matching response
     //      - All write requests have been comitted to the channel
-    request_tracker request_tracker_mod
-    (
-        .clk(clk),
-        .reset(reset),
+    // request_tracker request_tracker_mod
+    // (
+    //     .clk(clk),
+    //     .reset(reset),
 
-        .c0_req(fiu.c0Tx.valid),
-        .c1_req(fiu.c1Tx.valid),
-        .c0_resp(cci_c0Rx_isReadRsp(fiu.c0Rx)),
-        .c1_resp(cci_c1Rx_isWriteRsp(fiu.c1Rx)),
+    //     .c0_req(fiu.c0Tx.valid),
+    //     .c1_req(fiu.c1Tx.valid),
+    //     .c0_resp(cci_c0Rx_isReadRsp(fiu.c0Rx)),
+    //     .c1_resp(cci_c1Rx_isWriteRsp(fiu.c1Rx)),
 
-        .c0_busy(rd_interface_busy),
-        .c1_busy(wr_interface_busy)
-    );
+    //     .c0_busy(rd_interface_busy),
+    //     .c1_busy(wr_interface_busy)
+    // );
 
 endmodule

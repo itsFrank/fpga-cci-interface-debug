@@ -21,18 +21,27 @@ int main(int argc, char** argv) {
 
     options.addOption("w", "-w", "workspace size in log2(CLs)");
     options.addOption("d", "-d", "data size in log2(CLs)");
+    options.addOption("b", "-b", "Exact bytes of WS");
     options.addOption("v", "-v", "validate results");
 
     options.parse(argc, argv);
+
+    if (options.is("w") && options.is("b")) {
+        std::cout << options.genHelp() << std::endl;
+        std::cout << "Cannot have both -b and -d" << std::endl;
+        exit(-1);
+    }
 
     if (!options.is("d")) {
         std::cout << options.genHelp() << std::endl;
         std::cout << "Option -d is required" << std::endl;
         exit(-1);
     }
-
+    int force_byte_cls = options.asInt("b");
+    std::cout << force_byte_cls << std::endl;
     int log2_data_cls = options.asInt("d");
     int log2_workspace_cls = options.is("w") ? options.asInt("w") : options.asInt("d");
+    log2_workspace_cls = options.is("b") ? options.asInt("b") : log2_workspace_cls;
 
     if (log2_workspace_cls < log2_data_cls) {
         std::cout << "Num workspace CLs must be larger than data CLs" << std::endl;
@@ -56,15 +65,21 @@ int main(int argc, char** argv) {
     opaeutils::AFUWorkspace afu_workspace; //("092a3e62-81c5-499a-ae2c-62ff4788fadd");
     afu_workspace.addBuffer("afu_ctrl", 1);
     afu_workspace.addBuffer("afu_stts", 1);
-    afu_workspace.addBuffer("rd_data", num_data_cls);
+    // afu_workspace.addBuffer("rd_data", num_data_cls);
     afu_workspace.addBuffer("wr_data", num_data_cls);
     afu_workspace.addBuffer("rd_pad", num_padding_cls);
     afu_workspace.addBuffer("wr_pad", num_padding_cls);
 
+    // Allocate buffers individually
+    auto rd_handle = fpga.allocBuffer(num_data_cls * 64);
+    uint64_t* afu_rd_data = (uint64_t*)reinterpret_cast<volatile uint64_t*>(rd_handle->c_type());
+
     // Allocate workspace & pin memory
-    auto buf_handle = fpga.allocBuffer(afu_workspace.getWorkspaceBytes());
+    auto buf_handle = fpga.allocBuffer(options.is("b") ? ((uint64_t)options.asInt("b")) * 64 : afu_workspace.getWorkspaceBytes());
     auto buf = reinterpret_cast<volatile uint64_t*>(buf_handle->c_type());
     assert(NULL != buf);
+
+    std::cout << "Allocated: " << (options.is("b") ? ((uint64_t)options.asInt("b")) * 64 : afu_workspace.getWorkspaceBytes()) << " bytes" << std::endl;
 
     // Populate pointer addresses
     afu_workspace.allocateWorkspace(buf);
@@ -72,7 +87,7 @@ int main(int argc, char** argv) {
     // Assign worskpace pointers
     uint64_t* afu_ctrl = afu_workspace.getBufferPtr("afu_ctrl");
     uint64_t* afu_stts = afu_workspace.getBufferPtr("afu_stts");
-    uint64_t* afu_rd_data = afu_workspace.getBufferPtr("rd_data");
+    // uint64_t* afu_rd_data = afu_workspace.getBufferPtr("rd_data");
     uint64_t* afu_wr_data = afu_workspace.getBufferPtr("wr_data");
 
     // Initialize & start AFU
