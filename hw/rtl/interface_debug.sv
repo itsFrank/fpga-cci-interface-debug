@@ -43,7 +43,7 @@ module app_afu (
 		logic 				rd_valid;
 		rd_req_hdr_config_t rd_hdr;                  
 		
-		t_uint32 rd_resp_fifo_overflow_risk; // Tracks if additional outstanding reads would risk overflowing the FIFO 
+		logic rd_resp_fifo_overflow_risk; // Tracks if additional outstanding reads would risk overflowing the FIFO 
 
 		// Write 
 		logic 				wr_interface_busy; // Asserted when there requests still not committed to the channel
@@ -210,7 +210,7 @@ module app_afu (
 		.clk(clk),
 		.stall(fiu.c0TxAlmFull || rd_resp_fifo_overflow_risk),
 
-		.afu_state(afu_state),
+		.afu_state_in(afu_state),
 		.ctrl_addr(afu_ctrl_addr),
 		.ctrl_resp(ctrl_resp),
 
@@ -229,7 +229,7 @@ module app_afu (
 		.clk(clk),
 		.stall(fiu.c1TxAlmFull),
 
-		.afu_state(afu_state),
+		.afu_state_in(afu_state),
     	.stts_addr(afu_stts_addr),
 
 		.wr_start_addr(ctrl_resp.wr_addr),
@@ -335,7 +335,7 @@ module app_afu (
 					data_reqs_sent <= data_reqs_sent + 1;
 				end
 
-				if (cci_c0Rx_isReadRsp(fiu.c0Rx) && (fiu.c0Rx.hdr.mdata == READ_CTRL_MDATA)) begin  
+				if (cci_c0Rx_isReadRsp(fiu.c0Rx) && (fiu.c0Rx.hdr.mdata == READ_RUN_MDATA)) begin  
 					data_reqs_ackd <= data_reqs_ackd + 1;
 				end
             end

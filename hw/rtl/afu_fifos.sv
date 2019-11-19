@@ -13,12 +13,12 @@
 localparam FIFO_ALM_FULL_BUFFER = 16;
 
 // Read FIFO config
-localparam READ_RESP_FIFO_DEPTH         = 512;
+localparam READ_RESP_FIFO_DEPTH         = 1024;
 localparam READ_RESP_FIFO_DATA_WIDTH    = $bits(t_cci_clData);
 localparam READ_RESP_FIFO_COUNT_WIDTH = $clog2(READ_RESP_FIFO_DEPTH);
 
 // Write FIFO config
-localparam WRITE_DATA_FIFO_DEPTH        = 512;
+localparam WRITE_DATA_FIFO_DEPTH        = 64;
 localparam WRITE_DATA_FIFO_DATA_WIDTH   = $bits(t_cci_clData);
 localparam WRITE_DATA_FIFO_COUNT_WIDTH = $clog2(WRITE_DATA_FIFO_DEPTH);
 

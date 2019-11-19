@@ -6,7 +6,7 @@ module WRITE_ENGINE (
     input logic clk,
     input logic stall, // Temporairly prevent writes (must be able to handle at least 3 requests after assertion)
     
-    input e_afu_state   afu_state,
+    input e_afu_state   afu_state_in,
     input t_cci_clAddr  stts_addr,
     
     input t_cci_clAddr  wr_start_addr, // Output is streamed starting at this address
@@ -16,6 +16,11 @@ module WRITE_ENGINE (
     output t_cci_clAddr wr_addr,
     output t_cci_clData wr_data
 );
+    // Register AFU state to alleviate routing
+    e_afu_state afu_state;
+    always_ff @(posedge clk) begin
+        afu_state <= afu_state_in;
+    end
 
     // Run Logic
     logic           r_wr_valid;

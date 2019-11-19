@@ -6,7 +6,7 @@ module READ_ENGINE (
     input logic clk,
     input logic stall,
 
-    input e_afu_state       afu_state,
+    input e_afu_state       afu_state_in,
     input t_cci_clAddr      ctrl_addr,
     ctrl_resp_if.to_module  ctrl_resp,
 
@@ -16,7 +16,8 @@ module READ_ENGINE (
 
     output logic run_done
 );
-    
+    e_afu_state afu_state;
+
     // Run logic
     logic        r_rd_valid;
     t_cci_mdata  r_mdata;
@@ -32,6 +33,9 @@ module READ_ENGINE (
     t_cci_clAddr    r_addr_s1;
     t_cci_clAddr    r_addr_s2;
     always_ff @(posedge clk) begin
+        // Register AFU state to alleviate routing
+        afu_state <= afu_state_in;
+
         rd_valid_s1  <= 0;
 
         r_rd_valid  <= rd_valid_s2 && ~run_done;
