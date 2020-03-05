@@ -37,6 +37,9 @@ module app_afu (
     t_ccip_clAddr afu_ctrl_addr; // REG 1 - Control word from CPU to AFU (used by CPU to tell AFU to begin a kernel run)
     t_ccip_clAddr afu_stts_addr; // REG 2 - Control word from AFU to CPU (used by AFU to tell CPU it has completed a kernel run)
 
+	logic rd_disabled; // Enable / Disable reads through CSRs
+	logic wr_disabled; // Enable / Disable writes through CSRs
+
 	// Request Headers
 		// Read
 		logic 				rd_interface_busy; // Asserted when there are un-acknowledged requests
@@ -55,12 +58,27 @@ module app_afu (
 	t_cci_clData 	ctrl_resp_data;
 	ctrl_resp_if 	ctrl_resp(clk, reset, ctrl_resp_valid, ctrl_resp_data);
 
+	t_uint32 num_req_sent;
+
 	//------ CSRs From CPU ------
-	reg [63:0] cpu_wr_csrs[7:0];
+	reg [7:0] [63:0] cpu_wr_csrs ;
 
 	always_ff @(posedge clk) begin
 		afu_ctrl_addr <= byteAddrToClAddr(cpu_wr_csrs[1]);
 		afu_stts_addr <= byteAddrToClAddr(cpu_wr_csrs[2]);
+
+		// Disable interface only in run state
+		unique case(afu_state)
+			AFU_RUN: begin
+				rd_disabled <= cpu_wr_csrs[3][0];
+				wr_disabled <= cpu_wr_csrs[4][0];
+			end
+
+			default: begin
+				rd_disabled <= 0;
+				wr_disabled <= 0;
+			end
+		endcase
 	end
 
 	/********************************************/
@@ -76,6 +94,10 @@ module app_afu (
 
 	assign rd_resp_fifo.rd_en = ~rd_resp_fifo.empty && ~wr_data_fifo.alm_full;
 
+	logic run_done_condition;
+	logic normal_done_condition;
+	logic io_disabled_done_condition;
+
 	always_ff @(posedge clk) begin
 		wr_data_fifo.wr_en 		<= 0;
 		wr_data_fifo.data_in 	<= rd_resp_fifo.data_out;
@@ -84,6 +106,11 @@ module app_afu (
 			wr_data_fifo.wr_en <= 1;
 		end
 
+		normal_done_condition 		<= num_cls_processed == ctrl_resp.num_cls && wr_data_fifo.empty;
+		io_disabled_done_condition 	<= num_req_sent == ctrl_resp.num_cls;
+		
+		run_done_condition <= ((rd_disabled || wr_disabled) & io_disabled_done_condition) || (~rd_disabled && ~wr_disabled && normal_done_condition);
+
 		unique case(afu_state)
 			AFU_RUN: begin
 				if (~rd_resp_fifo.empty && ~wr_data_fifo.alm_full) begin // data in rd FIFO and space in wr FIFO
@@ -91,7 +118,7 @@ module app_afu (
 					num_cls_processed <= num_cls_processed + 1;
 				end
 
-				if (num_cls_processed == ctrl_resp.num_cls && wr_data_fifo.empty) begin
+				if (run_done_condition) begin
 					afu_done_counter <= afu_done_counter + 1;
 				end
 				else begin
@@ -208,7 +235,7 @@ module app_afu (
 
 	READ_ENGINE read_engine_mod (
 		.clk(clk),
-		.stall(fiu.c0TxAlmFull || rd_resp_fifo_overflow_risk),
+		.stall(rd_disabled ? fiu.c1TxAlmFull : (fiu.c0TxAlmFull || rd_resp_fifo_overflow_risk)),
 
 		.afu_state_in(afu_state),
 		.ctrl_addr(afu_ctrl_addr),
@@ -278,17 +305,15 @@ module app_afu (
 		wr_hdr.params.cl_len = eCL_LEN_1;
 		wr_hdr.hint = eREQ_WRLINE_I;
 		wr_hdr.metadata = '0;
-		wr_hdr.hdr = cci_mpf_c1_genReqHdr(wr_hdr.hint, wr_hdr.addr, wr_hdr.metadata, wr_hdr.params);
+		wr_hdr.hdr = cci_mpf_c1_genReqHdr(wr_hdr.hint, rd_disabled ? rd_hdr.addr : wr_hdr.addr, wr_hdr.metadata, wr_hdr.params);
 	end
 
 	always_ff @(posedge clk) begin
 		// Send read requests
-		fiu.c0Tx.valid 	<= rd_valid;
-		fiu.c0Tx 		<= cci_mpf_genC0TxReadReq(rd_hdr.hdr, rd_valid);
+		fiu.c0Tx <= cci_mpf_genC0TxReadReq(rd_hdr.hdr, rd_valid && ~rd_disabled);
 
 		// Send write requests
-		fiu.c1Tx.valid  <= wr_valid;
-		fiu.c1Tx        <= cci_mpf_genC1TxWriteReq(wr_hdr.hdr, wr_data, wr_valid);                                                           
+		fiu.c1Tx <= cci_mpf_genC1TxWriteReq(wr_hdr.hdr, wr_data, rd_disabled ? rd_valid : (wr_valid && ~wr_disabled));                                                           
 	end
 
 	//CSR READ Control
@@ -338,11 +363,18 @@ module app_afu (
 				if (cci_c0Rx_isReadRsp(fiu.c0Rx) && (fiu.c0Rx.hdr.mdata == READ_RUN_MDATA)) begin  
 					data_reqs_ackd <= data_reqs_ackd + 1;
 				end
+
+				if (rd_valid) begin
+					num_req_sent <= num_req_sent + 1;
+				end
+
             end
 
             default: begin
                 data_reqs_sent <= '0;
                 data_reqs_ackd <= '0;
+
+				num_req_sent <= '0;
             end
         endcase
 	end
@@ -363,8 +395,8 @@ module app_afu (
         // Check if intermediate count is greater than stall threshold
         rd_resp_fifo_overflow_risk <= rd_resp_fifo_count_intermediate > t_uint32'(READ_RESP_FIFO_DEPTH - FIFO_ALM_FULL_BUFFER);
 
-		rd_interface_busy <= ~c0NotEmpty;
-		wr_interface_busy <= ~c1NotEmpty;
+		rd_interface_busy <= c0NotEmpty;
+		wr_interface_busy <= c1NotEmpty;
     end
 
 	// Tracks outstanding (un-ackd) request counts for read / write interface

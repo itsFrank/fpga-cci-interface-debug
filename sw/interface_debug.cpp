@@ -13,6 +13,9 @@
 #include <fstream>
 #include <string>
 
+#define ENABLE_IO 0x00000000
+#define DISABLE_IO 0x00000001
+
 int main(int argc, char** argv) {
     spinASEReady(argv[0]);
 
@@ -23,6 +26,9 @@ int main(int argc, char** argv) {
     options.addOption("d", "-d", "data size in log2(CLs)");
     options.addOption("b", "-b", "Exact bytes of WS");
     options.addOption("v", "-v", "validate results");
+    options.addOption("dr", "-dr", "disable read");
+    options.addOption("dw", "-dw", "disable write");
+    options.addOption("r", "-r", "Number of repetitions");
 
     options.parse(argc, argv);
 
@@ -49,7 +55,7 @@ int main(int argc, char** argv) {
     }
 
     bool validate = options.is("v");
-    int num_data_cls = 1 << log2_data_cls;
+    uint32_t num_data_cls = 1 << log2_data_cls;
     int num_padding_cls = (1 << log2_workspace_cls) - num_data_cls;
 
     std::cout << "Run Configuration:" << std::endl;
@@ -67,8 +73,8 @@ int main(int argc, char** argv) {
     afu_workspace.addBuffer("afu_stts", 1);
     // afu_workspace.addBuffer("rd_data", num_data_cls);
     afu_workspace.addBuffer("wr_data", num_data_cls);
-    afu_workspace.addBuffer("rd_pad", num_padding_cls);
-    afu_workspace.addBuffer("wr_pad", num_padding_cls);
+    // afu_workspace.addBuffer("rd_pad", num_padding_cls);
+    // afu_workspace.addBuffer("wr_pad", num_padding_cls);
 
     // Allocate buffers individually
     auto rd_handle = fpga.allocBuffer(num_data_cls * 64);
@@ -91,6 +97,9 @@ int main(int argc, char** argv) {
     uint64_t* afu_wr_data = afu_workspace.getBufferPtr("wr_data");
 
     // Initialize & start AFU
+    csrs.writeCSR(3, options.is("dr") ? DISABLE_IO : ENABLE_IO);
+    csrs.writeCSR(4, options.is("dw") ? DISABLE_IO : ENABLE_IO);
+
     uint8_t afu_nonce = AFU_initControl(csrs, afu_ctrl, afu_stts, false);
     
     // Set read data (no need to write data if we are not validating)
@@ -104,11 +113,16 @@ int main(int argc, char** argv) {
 
     // Run kernel
     std::cout << "Starting AFU kernel" << std::endl;
-    timer.start();
-    AFU_sendControl(AFU_CONTROL::START_RUN, afu_ctrl, afu_stts, afu_rd_data, afu_wr_data, num_data_cls, afu_nonce);
-    // Wait kernel complete
-    AFU_waitStatus(afu_stts, AFU_STATUS::DONE);
-    double elapsed_s = timer.elapsed_s();
+    double elapsed_s = 0.0;
+    int num_reps = options.is("r") ? options.asInt("r") : 1;
+    for (int i = 0; i < num_reps; i++) {
+        timer.start();
+        AFU_sendControl(AFU_CONTROL::START_RUN, afu_ctrl, afu_stts, afu_rd_data, afu_wr_data, num_data_cls, afu_nonce);
+        // Wait kernel complete
+        AFU_waitStatus(afu_stts, AFU_STATUS::DONE);
+        elapsed_s += timer.elapsed_s();
+    }
+    elapsed_s /= ((double)num_reps);
     std::cout << "AFU kernel done in " << elapsed_s << " seconds" << std::endl;
     std::cout << "AFU wrote " << afu_stts[1] << " cls" << std::endl;
 
@@ -134,6 +148,14 @@ int main(int argc, char** argv) {
     AFU_sendControl(AFU_CONTROL::SHUTDOWN, afu_ctrl, afu_stts, afu_nonce);
     AFU_waitState(csrs, AFU_STATE::SHUTDOWN);
     
+    std::cout << std::endl << std::endl;
+
+    double one_way_bytes = (double)(num_data_cls) * 64.0;
+    double two_way_bytes = (double)(num_data_cls) * 64.0 * 2.0;
+    if (!options.is("dr")) std::cout << "Rd  BW: " << one_way_bytes / elapsed_s /1000000000 << std::endl;
+    if (!options.is("dw")) std::cout << "Wr  BW: " << one_way_bytes / elapsed_s /1000000000 << std::endl;
+    if (!options.is("dw") and !options.is("dr")) std::cout << "Tot BW: " << two_way_bytes / elapsed_s /1000000000 << std::endl;
+
     // MPF VTP (virtual to physical) statistics
     auto mpf = fpga.mpf;
     if (mpfVtpIsAvailable(*mpf))
